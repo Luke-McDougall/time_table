@@ -33,6 +33,7 @@ fn main() {
     let buffer = io::stdin();
     // The date value will be piped to this program by the date command
     let mut date: String = String::new();
+
     // Structs containing timetable info for a given weekday. Hardcoded for now
     let fri = Day {
         classes: vec![Class {
@@ -94,12 +95,10 @@ fn main() {
 
         }],
     };
+
     // Array of structs containing timetable info for each weekday
     let week = [mon, tue, wed, thu, fri];
-    
-
     buffer.read_line(&mut date).unwrap();
-
     let date_vec: Vec<&str> = date.split_whitespace().collect();
     let hour: u32 = date_vec[3][0..2].parse().unwrap();
 
@@ -123,7 +122,49 @@ fn main() {
 
     println!("{}", date_vec[3]);
 
-    let file_result = File::open("/home/luke/todo");
+    let today_num = date_number(&date_vec);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut file = File::open("/home/luke/.config/timetable/calender_bin.t").unwrap();
+    file.read_to_end(&mut buffer).unwrap();
+
+    let mut idx = 0;
+    let mut a;
+    let mut b;
+    let mut c;
+    let mut s;
+
+    loop {
+        if idx >= buffer.len() {
+            break;
+        }
+        a = buffer[idx + 1];
+        b = buffer[idx + 2];
+        c = (a as u16) << 8 | b as u16;
+
+        if (c as i16 - today_num as i16) < 0 {
+            idx += buffer[idx] as usize;
+            continue;
+        } else if c - today_num > 7 {
+            break;
+        }
+
+        unsafe {
+            s = String::from_utf8_unchecked(buffer[idx + 3..idx + buffer[idx] as usize].to_vec());
+        }
+        idx += buffer[idx] as usize;
+        if c - today_num < 3 {
+            terminal.fg(term::color::RED).unwrap();
+            println!("*{} in {} days!", s, c - today_num);
+        } else if c - today_num < 5 {
+            terminal.fg(term::color::YELLOW).unwrap();
+            println!("*{} in {} days.", s, c - today_num);
+        } else {
+            terminal.fg(term::color::GREEN).unwrap();
+            println!("*{} in {} days.", s, c - today_num);
+        }
+    }
+
+    let file_result = File::open("/home/luke/.config/timetable/todo.t");
     let mut file;
     let mut todo_list: String = String::new();
     match file_result {
@@ -153,7 +194,7 @@ fn main() {
     }
 
     terminal.fg(term::color::WHITE).unwrap();
-    println!("TODO");
+    println!("\nTODO");
     terminal.fg(term::color::GREEN).unwrap();
 
     for e in &completed {
@@ -207,4 +248,33 @@ fn main() {
     }
     
     // weekday, month, day, time, timzone, year.
+}
+
+// This function generates the total number of days into the current year todays date is.
+// This is so that finding the difference in days between the current day and calender
+// entries is easy.
+fn date_number(date_vec: &Vec<&str>) -> u16 {
+    let month: u16 = match date_vec[1] {
+        "Jan" => 0,
+        "Feb" => 31,
+        "Mar" => 59,
+        "Apr" => 90,
+        "May" => 120,
+        "Jun" => 151,
+        "Jul" => 181,
+        "Aug" => 212,
+        "Sep" => 243,
+        "Oct" => 273,
+        "Nov" => 304,
+        "Dec" => 334,
+        _ => panic!("Something went wrong, no valid month found."),
+    };
+
+    let day: u16 = date_vec[2].parse().unwrap();
+    let year: u16 = date_vec.last().unwrap().parse().unwrap();
+    if year % 4 == 0 && month > 31 {
+        month + day + 1
+    } else {
+        month + day
+    }
 }
